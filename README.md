@@ -1,48 +1,71 @@
-# Policy Ingestion and Retrieval Engine
+# RAG-Based SOP Assistant
 
-This project implements a Retrieval-Augmented Generation (RAG) system for querying policy documents.
+## Overview
+This project implements a Retrieval-Augmented Generation (RAG) system for Standard Operating Procedures (SOPs).
+It ingests PDF policies, provides a chat interface, and exposes a streaming API.
 
-## 📁 Directory Structure
+## Features
+- **Auto-Ingestion**: Automatically processes PDFs in `data/raw`.
+- **RAG Pipeline**: Uses LangChain, FAISS, and Ollama.
+- **FastAPI Backend**: Exposes `/chat` endpoint with streaming.
+- **Citations**: Returns source document and page number with every answer.
+- **Rate Limiting**: Protects API with 10 requests/minute limit.
+- **Dockerized**: Ready for container deployment.
+
+## Installation
+
+1. **Prerequisites**
+   - Python 3.9+
+   - Ollama (running locally)
+
+2. **Setup**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Ingestion**
+   Run the ingestion pipeline to create the vector index:
+   ```bash
+   python src/ingestion/run_ingestion.py
+   ```
+
+## Running the API
+
+Start the FastAPI server:
+```bash
+python -m uvicorn app.main:app --reload
 ```
-policy-ingestion-pipeline/
-├── src/              # Source code (ingestion & retrieval)
-├── app/              # CLI Application
-├── data/             # Data storage (raw PDFs)
-├── vectorstore/      # Persisted FAISS index
-├── libs/             # Local libraries (custom fix for environment)
-└── TROUBLESHOOTING.md
+The API is available at `http://localhost:8000`.
+
+### API Endpoints
+
+#### POST `/chat`
+Streams the response in NDJSON format (newline delimited JSON).
+
+**Request:**
+```json
+{
+  "query": "What is the leave policy?",
+  "chat_history": []
+}
 ```
 
-## 🚀 Quick Start (Fresh Run)
-
-If you have closed everything, follow these exact steps:
-
-### Step 1: Start Database (Ollama)
-Open a **new, separate terminal window** and run:
-```powershell
-& "C:\Users\Asus\AppData\Local\Programs\Ollama\ollama.exe" serve
-```
-*(Keep this window open. It acts as the database server.)*
-
-### Step 2: Run Chat App
-Open your **main terminal** (inside this folder) and run:
-```powershell
-python app/cli.py
+**Response Stream:**
+```json
+{"type": "citations", "content": [{"source": "policies.pdf", "page": 1, "content": "..."}]}
+{"type": "token", "content": "The"}
+{"type": "token", "content": " leave"}
+...
 ```
 
----
+## Docker
 
-## ⚙️ Setup (First Time Only)
-If you haven't processed the PDF yet (or want to reset):
-```powershell
-python src/ingestion/run_ingestion.py
+Build and run the container:
+```bash
+docker build -t rag-sop-app .
+docker run -p 8000:8000 rag-sop-app
 ```
 
-## 🛠 Features
--   **Ingestion (Week 1)**: Robust PDF loaders & standard chunks.
--   **Retrieval (Week 2)**: Strict guardrails against hallucination.
--   **Local Dependencies**: Uses `libs/` to avoid Python version conflicts.
-
-## ❓ Troubleshooting
--   **Ollama Error**: If connection fails, ensure Step 1 is running.
--   **Imports Error**: If you see "ModuleNotFoundError", ensure you are running python from the project root so it finds `libs/`.
+## Rate Limiting
+The API is rate-limited to **10 requests per minute** by default.
+Exceeding this limit returns a `429 Too Many Requests` status.
